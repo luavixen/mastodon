@@ -26,46 +26,11 @@ module Status::InteractionPolicyConcern
   end
 
   # Returns `:automatic`, `:manual`, `:unknown` or `:denied`
-  def quote_policy_for_account(other_account, preloaded_relations: {})
-    return :denied if other_account.nil? || direct_visibility? || reblog?
+  def quote_policy_for_account(other_account, preloaded_relations: {}) # rubocop:disable Lint/UnusedMethodArgument
+    return :denied if other_account.nil?
 
-    following_author = nil
-    followed_by_author = nil
-
-    # Post author is always allowed to quote themselves
-    return :automatic if account_id == other_account.id
-
-    automatic_policy = quote_approval_policy >> 16
-    manual_policy = quote_approval_policy & 0xFFFF
-
-    return :automatic if automatic_policy.anybits?(QUOTE_APPROVAL_POLICY_FLAGS[:public])
-
-    if automatic_policy.anybits?(QUOTE_APPROVAL_POLICY_FLAGS[:followers])
-      following_author = preloaded_relations[:following] ? preloaded_relations[:following][account_id] : other_account.following?(account) if following_author.nil?
-      return :automatic if following_author
-    end
-
-    if automatic_policy.anybits?(QUOTE_APPROVAL_POLICY_FLAGS[:following])
-      followed_by_author = account.following?(other_account) if followed_by_author.nil?
-      return :automatic if followed_by_author
-    end
-
-    # We don't know we are allowed by the automatic policy, considering the manual one
-    return :manual if manual_policy.anybits?(QUOTE_APPROVAL_POLICY_FLAGS[:public])
-
-    if manual_policy.anybits?(QUOTE_APPROVAL_POLICY_FLAGS[:followers])
-      following_author = preloaded_relations[:following] ? preloaded_relations[:following][account_id] : other_account.following?(account) if following_author.nil?
-      return :manual if following_author
-    end
-
-    if manual_policy.anybits?(QUOTE_APPROVAL_POLICY_FLAGS[:following])
-      followed_by_author = account.following?(other_account) if followed_by_author.nil?
-      return :manual if followed_by_author
-    end
-
-    return :unknown if (automatic_policy | manual_policy).anybits?(QUOTE_APPROVAL_POLICY_FLAGS[:unsupported_policy])
-
-    :denied
+    # LUA: Logged-in users can always quote no matter what the policy is :3
+    :automatic
   end
 
   def downgrade_quote_policy
